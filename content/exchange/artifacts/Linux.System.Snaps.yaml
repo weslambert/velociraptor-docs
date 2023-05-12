@@ -1,0 +1,32 @@
+name: Linux.System.Snaps
+description: |
+  List installed Snap packages.
+  
+  Similar to `Linux.RHEL.Packages`, a Grok expression is used to parse the lines returned by `snap list`.
+type: CLIENT
+author: Wes Lambert - @therealwlambert, @weslambert@infosec.exchange
+
+reference:
+  - https://snapcraft.io/about
+parameters:
+  - name: SnapGrok
+    description: A Grok expression to parse the output from `snap list`
+    default: "%{DATA:Snap}%{SPACE} %{DATA:Version}%{SPACE} %{DATA:Revision}%{SPACE} %{DATA:Tracking}%{SPACE} %{DATA:Publisher}%{SPACE} %{GREEDYDATA:Notes}"
+
+sources:
+  - precondition: |
+      SELECT OS From info() where OS = 'linux'
+
+    query: |
+        SELECT 
+          Snap, 
+          Version, 
+          Revision, 
+          Tracking, 
+          Publisher, 
+          Notes 
+        FROM foreach(row={
+          SELECT grok(grok=GrokPattern, data=Stdout) AS Snaps 
+          FROM execve(argv=["snap", "list"], sep="\n") 
+          WHERE NOT Stdout = "" 
+          AND count() > 1}, column="Snaps")
